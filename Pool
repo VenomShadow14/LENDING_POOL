@@ -1,0 +1,95 @@
+from web3 import Web3
+import json
+
+# Connect to an Ethereum node (via Infura, Alchemy, or a local node)
+INFURA_URL = "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+w3 = Web3(Web3.HTTPProvider(INFURA_URL))
+
+# Aave Lending Pool and Lending Pool Address Provider Contract Addresses
+# These are on Ethereum Mainnet; adjust for other networks (Polygon, etc.)
+LENDING_POOL_ADDRESS_PROVIDER = "0x24a29c97d6bc4f257e8f51e41bfa6d85c14f2e0f"
+LENDING_POOL_ADDRESS = "0x3f2f1fa9fa69a84b5ac11e6353c82ec0b6265a9e"  # Mainnet lending pool address
+
+# ABI for the LendingPoolAddressProvider contract
+LENDING_POOL_ADD_PROVIDER_ABI = '''
+[
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "getLendingPool",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+'''
+
+# ABI for the LendingPool contract
+LENDING_POOL_ABI = '''
+[
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address"
+      }
+    ],
+    "name": "getReserveData",
+    "outputs": [
+      {
+        "name": "currentLiquidityRate",
+        "type": "uint256"
+      },
+      {
+        "name": "currentVariableBorrowRate",
+        "type": "uint256"
+      },
+      {
+        "name": "currentStableBorrowRate",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+'''
+
+# Example: Fetch lending rates for USDC (or any ERC20 token)
+USDC_ADDRESS = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"  # USDC token address on Ethereum
+
+def get_lending_rates():
+    # Connect to LendingPool AddressProvider contract
+    lending_pool_address_provider = w3.eth.contract(address=LENDING_POOL_ADDRESS_PROVIDER, abi=LENDING_POOL_ADD_PROVIDER_ABI)
+    lending_pool_address = lending_pool_address_provider.functions.getLendingPool().call()
+
+    # Connect to LendingPool contract
+    lending_pool = w3.eth.contract(address=lending_pool_address, abi=LENDING_POOL_ABI)
+
+    # Fetch Reserve data for USDC (or another asset)
+    reserve_data = lending_pool.functions.getReserveData(USDC_ADDRESS).call()
+
+    # Extract rates (rates are in raw format and need to be divided by 1e25 for percentage)
+    current_liquidity_rate = reserve_data[0] / 1e25
+    current_variable_borrow_rate = reserve_data[1] / 1e25
+    current_stable_borrow_rate = reserve_data[2] / 1e25
+
+    return {
+        "current_liquidity_rate": current_liquidity_rate,
+        "current_variable_borrow_rate": current_variable_borrow_rate,
+        "current_stable_borrow_rate": current_stable_borrow_rate
+    }
+
+if __name__ == "__main__":
+    rates = get_lending_rates()
+    print(f"Current Liquidity Rate: {rates['current_liquidity_rate']}%")
+    print(f"Current Variable Borrow Rate: {rates['current_variable_borrow_rate']}%")
+    print(f"Current Stable Borrow Rate: {rates['current_stable_borrow_rate']}%")
